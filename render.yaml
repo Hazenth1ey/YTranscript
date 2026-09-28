@@ -1,0 +1,24 @@
+# Render "Blueprint": describes the service so Render can create it in one go.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# To deploy: push this repo to GitHub, then in the Render dashboard choose
+# "New > Blueprint", pick the repo, and click Apply. Render builds the
+# Dockerfile and gives you a public https://... address.
+
+services:
+  - type: web
+    name: ytranscript
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: YTRANSCRIPT_ENABLE_WHISPER
+        value: "0"
+      # YouTube often blocks cloud servers. If you see "YouTube blocked the
+      # request", add a proxy here (see README > Deploying to the web).
+      # - key: YTRANSCRIPT_PROXY_URL
+      #   sync: false   # "sync: false" = you enter the secret in the dashboard
+      # - key: WEBSHARE_PROXY_USERNAME
+      #   sync: false
+      # - key: WEBSHARE_PROXY_PASSWORD
+      #   sync: false
