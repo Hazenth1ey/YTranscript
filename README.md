@@ -145,7 +145,26 @@ run it, and hosting platforms know how to use one.
 Free-tier services fall asleep after 15 minutes without visitors, so the
 first request after a pause takes about a minute. Every later request is fast.
 
-### Option B: any other host
+### Option B: Vercel (free tier)
+
+Vercel doesn't use the Dockerfile. It runs Python as "serverless functions":
+small programs started on demand for each request. The repository includes
+the two files Vercel needs, `api/index.py` (the entry point) and
+`vercel.json` (routes every address to it), plus `requirements.txt` (the
+packages to install).
+
+1. Create an account at <https://vercel.com> and connect it to GitHub.
+2. Click **Add New > Project**, pick this repository, leave the settings as
+   they are (Vercel detects everything from the files), and click **Deploy**.
+3. After a minute you get an address like `https://ytranscript.vercel.app`.
+
+Every push to the repository redeploys automatically. Whisper is always off
+on Vercel: a serverless function has a 60-second limit and no room for a
+speech-recognition model. Environment variables (for a proxy, see below) go
+under **Settings > Environment Variables** in the Vercel project, followed
+by a redeploy.
+
+### Option C: any other host
 
 Railway, Fly.io, Google Cloud Run, DigitalOcean App Platform, or a plain
 Linux server with Docker all work. Point them at the repository (or the
@@ -176,7 +195,8 @@ sensible default, so you only need them to change something.
 
 YouTube tends to refuse caption requests coming from data-centre addresses,
 which is where hosted apps live. From your own home connection this almost
-never happens; from Render or similar it can. The symptom is the message
+never happens; from Vercel, Render or similar it can, and Vercel's addresses
+(shared Amazon servers) are especially likely to be refused. The symptom is the message
 **"YouTube blocked the request"**.
 
 The fix is a proxy: your server sends the request through another address
@@ -239,7 +259,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-You should see `122 passed`. Whenever you change something, run this again; if
+You should see `125 passed`. Whenever you change something, run this again; if
 it still says all passed, you probably didn't break anything.
 
 ## Troubleshooting

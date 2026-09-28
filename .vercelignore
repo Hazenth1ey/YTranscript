@@ -1,0 +1,15 @@
+# Files Vercel should not upload (smaller, faster deploys).
+.git
+.venv
+venv
+__pycache__
+*.pyc
+*.egg-info
+.pytest_cache
+tests
+Dockerfile
+.dockerignore
+render.yaml
+Procfile
+*.srt
+*.vtt

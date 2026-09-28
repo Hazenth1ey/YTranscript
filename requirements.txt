@@ -1,0 +1,5 @@
+# Packages for the hosted (Vercel) version. Vercel installs from this file.
+# The full dependency list, including optional Whisper extras, lives in
+# pyproject.toml; this is the minimal set the web app needs.
+youtube-transcript-api>=1.0
+flask>=3.0
