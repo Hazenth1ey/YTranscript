@@ -53,4 +53,6 @@ def test_dashboard_setting_still_wins():
 def test_vercel_config_routes_everything_to_the_function():
     config = json.loads((REPO_ROOT / "vercel.json").read_text())
     assert config["rewrites"] == [{"source": "/(.*)", "destination": "/api/index"}]
-    assert "api/index.py" in config["functions"]
+    # "framework": null overrides any framework preset left on the Vercel
+    # project (e.g. Next.js), which would otherwise fail the build instantly.
+    assert "framework" in config and config["framework"] is None

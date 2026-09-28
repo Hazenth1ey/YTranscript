@@ -159,10 +159,18 @@ packages to install).
 3. After a minute you get an address like `https://ytranscript.vercel.app`.
 
 Every push to the repository redeploys automatically. Whisper is always off
-on Vercel: a serverless function has a 60-second limit and no room for a
+on Vercel: a serverless function has a short time limit and no room for a
 speech-recognition model. Environment variables (for a proxy, see below) go
 under **Settings > Environment Variables** in the Vercel project, followed
 by a redeploy.
+
+If you connected an *existing* Vercel project rather than creating a new
+one, check its **Settings > General** page: **Framework Preset** should be
+"Other" and **Root Directory** should be empty. `vercel.json` sets the
+framework to none, which overrides the preset, but a wrong root directory
+makes the deployment fail within seconds with a message naming it. The
+deployment's **Build Logs** tab in the Vercel dashboard shows the exact
+reason for any failure.
 
 ### Option C: any other host
 
