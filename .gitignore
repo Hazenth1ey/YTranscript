@@ -1,0 +1,21 @@
+# Python leaves these behind while running; they never belong in git.
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Virtual environments (one per machine, never shared).
+.venv/
+venv/
+
+# Transcripts you generate locally.
+*.srt
+*.vtt
+!tests/**
+
+# Editor / OS noise.
+.vscode/
+.idea/
+.DS_Store
