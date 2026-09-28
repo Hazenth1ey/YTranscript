@@ -91,3 +91,55 @@ def test_unknown_format_falls_back_to_txt(client):
     resp = client.post("/", data={"url": URL, "format": "docx"})
     assert resp.status_code == 200
     assert "Download .txt" in resp.get_data(as_text=True)
+
+
+def test_health(client):
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ok"
+    assert "version" in body and "whisper_enabled" in body and "proxy" in body
+
+
+def test_api_returns_json_by_default(client):
+    resp = client.get("/api/transcript", query_string={"url": URL})
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("application/json")
+    body = resp.get_json()
+    assert body["video_id"] == "dQw4w9WgXcQ"
+    assert len(body["segments"]) == 3
+
+
+def test_api_other_format_is_plain_text(client):
+    resp = client.get("/api/transcript", query_string={"url": URL, "format": "srt", "languages": "es"})
+    assert resp.status_code == 200
+    assert resp.content_type.startswith("text/plain")
+    assert resp.get_data(as_text=True).startswith("1\n00:00:00,000")
+    assert client.calls[0][1]["languages"] == ["es"]
+
+
+def test_api_error_is_json(client):
+    resp = client.get("/api/transcript", query_string={"url": "https://www.youtube.com/watch?v=nocaptions1"})
+    assert resp.status_code == 400
+    assert "Captions are turned off" in resp.get_json()["error"]
+
+
+def test_whisper_options_shown_when_enabled(client, monkeypatch):
+    monkeypatch.setenv("YTRANSCRIPT_ENABLE_WHISPER", "1")
+    html = client.get("/").get_data(as_text=True)
+    assert 'name="whisper_fallback"' in html
+    assert "hosted version fetches YouTube captions only" not in html
+
+
+def test_whisper_disabled_hides_options_and_ignores_requests(client, monkeypatch):
+    monkeypatch.setenv("YTRANSCRIPT_ENABLE_WHISPER", "0")
+    html = client.get("/").get_data(as_text=True)
+    assert 'name="whisper_fallback"' not in html
+    assert 'name="whisper_model"' not in html
+    assert "hosted version fetches YouTube captions only" in html
+
+    # Even if someone sends the fields by hand, the server ignores them.
+    client.post("/", data={"url": URL, "whisper": "on", "whisper_fallback": "on"})
+    _, kwargs = client.calls[0]
+    assert kwargs["use_whisper"] is False
+    assert kwargs["whisper_fallback"] is False

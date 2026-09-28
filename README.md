@@ -114,6 +114,86 @@ Press `Ctrl+C` in the terminal to stop the server.
 The page only listens on your own machine. To change the port:
 `YTRANSCRIPT_PORT=8080 ytranscript-web`.
 
+The web app also has two small extra addresses:
+
+- `/health` returns a short JSON status. Hosting platforms use it to check
+  the app is alive.
+- `/api/transcript?url=<link>&format=srt` returns just the transcript, no
+  HTML, so other programs can call it. The default format here is `json`.
+  It accepts the same fields as the form (`languages`, `translate_to`,
+  `timestamps`).
+
+## Deploying to the web
+
+Running `ytranscript-web` only serves your own computer. To get a public
+address that works from any phone or laptop, the app has to run on a server.
+The repository is ready for that: a `Dockerfile` describes how to build and
+run it, and hosting platforms know how to use one.
+
+### Option A: Render (free tier, no credit card)
+
+1. Make sure this repository is on your GitHub account (it is, if you're
+   reading this there).
+2. Create an account at <https://render.com> and connect it to GitHub.
+3. In the Render dashboard click **New > Blueprint**, choose this repository,
+   and click **Apply**. Render reads `render.yaml`, builds the `Dockerfile`,
+   and starts the app.
+4. After a few minutes you get an address like
+   `https://ytranscript.onrender.com`. Open it: that's your transcript
+   generator, live.
+
+Free-tier services fall asleep after 15 minutes without visitors, so the
+first request after a pause takes about a minute. Every later request is fast.
+
+### Option B: any other host
+
+Railway, Fly.io, Google Cloud Run, DigitalOcean App Platform, or a plain
+Linux server with Docker all work. Point them at the repository (or the
+`Dockerfile`) and they'll do the rest. On a server with Docker installed:
+
+```bash
+docker build -t ytranscript .
+docker run -p 8000:8000 ytranscript
+# now open http://<server-address>:8000
+```
+
+The `Procfile` covers hosts that expect one (Railway, Heroku-style
+platforms) instead of a Dockerfile.
+
+### Settings for the hosted version
+
+Set these as *environment variables* in the hosting dashboard. Each has a
+sensible default, so you only need them to change something.
+
+| Variable | What it does |
+|----------|--------------|
+| `PORT` | Set automatically by the host. The app listens on it. |
+| `YTRANSCRIPT_ENABLE_WHISPER` | `1` or `0`. The Dockerfile sets `0`: speech-to-text needs more CPU and memory than hosting tiers give, and it would triple the image size. The page hides the Whisper options when off. |
+| `YTRANSCRIPT_PROXY_URL` | Route YouTube requests through a proxy, e.g. `http://user:pass@host:port`. See below. |
+| `WEBSHARE_PROXY_USERNAME`, `WEBSHARE_PROXY_PASSWORD` | Use Webshare rotating proxies instead (the caption library supports them natively and retries when an address is blocked). |
+
+### About YouTube blocking cloud servers
+
+YouTube tends to refuse caption requests coming from data-centre addresses,
+which is where hosted apps live. From your own home connection this almost
+never happens; from Render or similar it can. The symptom is the message
+**"YouTube blocked the request"**.
+
+The fix is a proxy: your server sends the request through another address
+that looks like a normal home connection. Residential proxy services such as
+Webshare offer small paid plans. Put the credentials in the variables above
+and redeploy. Until you add one, the hosted version may work for a while and
+then start getting blocked; the tool running on your own computer is not
+affected.
+
+### Security note
+
+The hosted page is public: anyone with the address can use it and each
+request costs your server a little work. Whisper stays off in the hosted
+version for exactly this reason. If you want to restrict access later, the
+simplest options are a password on the hosting platform's side (some offer
+this) or a small login check in `web.py`.
+
 ## Using it from your own Python code
 
 ```python
@@ -144,6 +224,7 @@ has comments explaining *why*, not just *what*.
 | `transcribe.py` | The optional Whisper fallback: download audio with `yt-dlp`, transcribe with `faster-whisper`. Imports its libraries lazily so the rest works without them. |
 | `formats.py` | One small function per output format, plus a `FORMATS` table the CLI and web page both read. Adding a format is a one-line change here. |
 | `pipeline.py` | The decision-maker: captions or Whisper? |
+| `config.py` | Reads settings from environment variables (port, Whisper on/off, proxy) so the hosted version can be configured without editing code. |
 | `cli.py` | The `ytranscript` command. Reads the options, calls `get_transcript`, prints or saves. |
 | `web.py` | The `ytranscript-web` page (Flask). The HTML lives inside the file so there is only one thing to read. |
 
@@ -158,7 +239,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-You should see `100 passed`. Whenever you change something, run this again; if
+You should see `122 passed`. Whenever you change something, run this again; if
 it still says all passed, you probably didn't break anything.
 
 ## Troubleshooting

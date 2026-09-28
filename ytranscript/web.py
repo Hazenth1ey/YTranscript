@@ -20,10 +20,9 @@ so you can read the whole thing in one sitting.
 
 from __future__ import annotations
 
-import os
+from flask import Flask, Response, jsonify, render_template_string, request
 
-from flask import Flask, Response, render_template_string, request
-
+from . import __version__, config
 from .errors import TranscriptError
 from .formats import FORMATS, extension_for, format_transcript
 from .pipeline import get_transcript
@@ -97,6 +96,7 @@ PAGE = """
         <label for="translate_to">Translate to <span class="small">(optional, e.g. en)</span></label>
         <input type="text" id="translate_to" name="translate_to" value="{{ translate_to }}" placeholder="leave empty to keep original">
       </div>
+      {% if whisper_enabled %}
       <div>
         <label for="whisper_model">Whisper model <span class="small">(only if used)</span></label>
         <select id="whisper_model" name="whisper_model">
@@ -105,11 +105,16 @@ PAGE = """
           {% endfor %}
         </select>
       </div>
+      {% endif %}
     </div>
 
     <label class="check"><input type="checkbox" name="timestamps" {% if timestamps %}checked{% endif %}> Add timestamps to plain text</label>
+    {% if whisper_enabled %}
     <label class="check"><input type="checkbox" name="whisper_fallback" {% if whisper_fallback %}checked{% endif %}> If there are no captions, transcribe the audio with Whisper (slow)</label>
     <label class="check"><input type="checkbox" name="whisper" {% if whisper %}checked{% endif %}> Always use Whisper (needed for non-YouTube links)</label>
+    {% else %}
+    <p class="small">This hosted version fetches YouTube captions only. Speech-to-text for videos without captions is available when running the tool on your own computer.</p>
+    {% endif %}
 
     <button type="submit">Get transcript</button>
   </form>
@@ -139,14 +144,17 @@ PAGE = """
 def _form_values(source) -> dict:
     """Read the form fields (or query-string) into a plain dictionary."""
     languages = source.get("languages", "en") or "en"
+    # When Whisper is switched off for this deployment, ignore any request
+    # for it, even a hand-crafted one, so the server never tries to run it.
+    whisper_ok = config.whisper_enabled()
     return {
         "url": (source.get("url") or "").strip(),
         "fmt": source.get("format", "txt") if source.get("format") in FORMATS else "txt",
         "languages": languages,
         "translate_to": (source.get("translate_to") or "").strip() or None,
         "timestamps": bool(source.get("timestamps")),
-        "whisper": bool(source.get("whisper")),
-        "whisper_fallback": bool(source.get("whisper_fallback")),
+        "whisper": whisper_ok and bool(source.get("whisper")),
+        "whisper_fallback": whisper_ok and bool(source.get("whisper_fallback")),
         "whisper_model": source.get("whisper_model") if source.get("whisper_model") in WHISPER_MODELS else DEFAULT_WHISPER_MODEL,
     }
 
@@ -183,6 +191,7 @@ def _render(values: dict, error: str | None = None, transcript=None, rendered: s
         PAGE,
         formats=FORMATS,
         whisper_models=WHISPER_MODELS,
+        whisper_enabled=config.whisper_enabled(),
         error=error,
         transcript=transcript,
         rendered=rendered,
@@ -224,10 +233,40 @@ def download():
     )
 
 
+@app.route("/health")
+def health():
+    """Tiny status page. Hosting platforms poll this to check the app is alive."""
+    return jsonify({"status": "ok", "version": __version__, **config.describe()})
+
+
+@app.route("/api/transcript")
+def api_transcript():
+    """A machine-friendly endpoint, e.g. for scripts or other apps.
+
+    ``GET /api/transcript?url=<link>&format=json`` returns the transcript as
+    JSON (the default). Any other format returns that format as plain text.
+    Errors come back as JSON with an HTTP 400 status.
+    """
+    source = request.args.to_dict()
+    source.setdefault("format", "json")
+    values = _form_values(source)
+    try:
+        transcript, rendered = _run(values)
+    except TranscriptError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if values["fmt"] == "json":
+        return Response(rendered, content_type="application/json; charset=utf-8")
+    return Response(rendered, content_type="text/plain; charset=utf-8")
+
+
 def main() -> None:
-    """Start the local web server (the ``ytranscript-web`` command)."""
-    host = os.environ.get("YTRANSCRIPT_HOST", "127.0.0.1")
-    port = int(os.environ.get("YTRANSCRIPT_PORT", "5000"))
+    """Start the built-in development server (the ``ytranscript-web`` command).
+
+    This is fine on your own computer. On a real host use gunicorn instead
+    (see the Dockerfile and Procfile), which is built for many users at once.
+    """
+    host, port = config.host(), config.port()
     print(f"YTranscript web UI running at http://{host}:{port}  (press Ctrl+C to stop)")
     app.run(host=host, port=port, debug=False)
 

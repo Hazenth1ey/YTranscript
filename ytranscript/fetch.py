@@ -31,6 +31,7 @@ from youtube_transcript_api._errors import (
     VideoUnplayable,
 )
 
+from . import config
 from .errors import (
     BlockedError,
     NoCaptionsError,
@@ -43,6 +44,11 @@ from .urls import canonical_url, extract_video_id
 # The language we try when the caller doesn't say. A *tuple* of language
 # codes, tried in order; "en" first, then anything else available.
 DEFAULT_LANGUAGES: tuple[str, ...] = ("en",)
+
+
+def default_api() -> YouTubeTranscriptApi:
+    """Build the YouTube client, routed through a proxy if one is configured."""
+    return YouTubeTranscriptApi(proxy_config=config.build_proxy_config())
 
 
 def _friendly_error(video_id: str, exc: Exception) -> TranscriptError:
@@ -98,7 +104,7 @@ def list_available_languages(url: str, api: YouTubeTranscriptApi | None = None) 
          "is_generated": False, "is_translatable": True}
     """
     video_id = extract_video_id(url)
-    api = api or YouTubeTranscriptApi()
+    api = api or default_api()
     try:
         transcript_list = api.list(video_id)
     except Exception as exc:  # noqa: BLE001 - we convert *everything* to our errors
@@ -140,7 +146,7 @@ def fetch_youtube_transcript(
     """
     video_id = extract_video_id(url)
     languages = list(languages) or list(DEFAULT_LANGUAGES)
-    api = api or YouTubeTranscriptApi()
+    api = api or default_api()
 
     try:
         transcript_list = api.list(video_id)
