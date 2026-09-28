@@ -13,7 +13,6 @@ venv/
 # Transcripts you generate locally.
 *.srt
 *.vtt
-!tests/**
 
 # Editor / OS noise.
 .vscode/
